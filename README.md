@@ -1,3 +1,398 @@
+### 1. **Imports and Random Seed**
+```python
+import numpy as np
+import pandas as pd
+
+# Set the random seed for reproducibility
+np.random.seed(123)
+```
+- **`numpy`** (`np`) is used for numerical operations like generating random numbers.
+- **`pandas`** (`pd`) is used to handle data in tabular format, especially for creating and manipulating DataFrames.
+- **`np.random.seed(123)`** sets a fixed seed for random number generation to ensure that the results are reproducible. This ensures that every time the code runs, the same random data is generated.
+
+### 2. **Creating an Imbalanced Dataset**
+```python
+# Create a dataframe with two classes
+n_samples = 1000
+class_0_ratio = 0.9
+n_class_0 = int(n_samples * class_0_ratio)
+n_class_1 = n_samples - n_class_0
+n_class_0,n_class_1
+```
+- **`n_samples = 1000`** defines the total number of samples.
+- **`class_0_ratio = 0.9`** means that 90% of the data will belong to class 0.
+- **`n_class_0 = int(n_samples * class_0_ratio)`** calculates the number of class 0 samples, which is 900 (90% of 1000).
+- **`n_class_1 = n_samples - n_class_0`** calculates the number of class 1 samples, which is 100 (the remaining 10%).
+
+This results in an imbalanced dataset with 900 samples of class 0 and only 100 samples of class 1.
+
+### 3. **Creating Data for Each Class**
+```python
+## CREATE MY DATAFRAME WITH IMBALANCED DATASET
+class_0 = pd.DataFrame({
+    'feature_1': np.random.normal(loc=0, scale=1, size=n_class_0),
+    'feature_2': np.random.normal(loc=0, scale=1, size=n_class_0),
+    'target': [0] * n_class_0
+})
+
+class_1 = pd.DataFrame({
+    'feature_1': np.random.normal(loc=2, scale=1, size=n_class_1),
+    'feature_2': np.random.normal(loc=2, scale=1, size=n_class_1),
+    'target': [1] * n_class_1
+})
+```
+- For **Class 0 (majority)**, you are creating a DataFrame with two features (`feature_1`, `feature_2`), both normally distributed around `mean=0` and `std_dev=1`. All samples in this class have a `target` of 0.
+- For **Class 1 (minority)**, the same two features are normally distributed but centered around `mean=2` to create a distinction from Class 0. All samples in this class have a `target` of 1.
+
+### 4. **Combining the DataFrames**
+```python
+df = pd.concat([class_0, class_1]).reset_index(drop=True)
+df.tail()
+```
+- **`pd.concat([class_0, class_1])`** combines the majority (Class 0) and minority (Class 1) data into one DataFrame.
+- **`reset_index(drop=True)`** ensures the index is reset after concatenation to avoid duplicate index values.
+- **`df.tail()`** prints the last 5 rows of the combined DataFrame.
+
+### 5. **Checking Class Distribution**
+```python
+df['target'].value_counts()
+```
+- **`df['target'].value_counts()`** displays the count of each class in the `target` column, showing that Class 0 has 900 samples and Class 1 has 100 samples—confirming the dataset is imbalanced.
+
+---
+
+## Upsampling (Over-Sampling)
+
+### 6. **Separating Majority and Minority Classes**
+```python
+df_minority = df[df['target'] == 1]
+df_majority = df[df['target'] == 0]
+```
+- **`df_minority = df[df['target'] == 1]`** filters the DataFrame to get only the minority class (Class 1).
+- **`df_majority = df[df['target'] == 0]`** filters the DataFrame to get the majority class (Class 0).
+
+### 7. **Resampling (Upsampling the Minority Class)**
+```python
+from sklearn.utils import resample
+
+df_minority_upsampled = resample(df_minority,
+                                 replace=True, # Sample with replacement
+                                 n_samples=len(df_majority), # Match majority class size
+                                 random_state=42
+                                )
+```
+- **`resample`** is a function from `sklearn.utils` that allows sampling with or without replacement.
+- **`replace=True`** means we are sampling *with replacement*, meaning the same sample can appear multiple times. This is necessary because we are oversampling the minority class to match the number of majority class samples.
+- **`n_samples=len(df_majority)`** ensures that the minority class is upsampled to have the same number of samples as the majority class (900 samples).
+- **`random_state=42`** ensures reproducibility, similar to setting a seed.
+
+### 8. **Combining the Upsampled Minority Class with the Majority Class**
+```python
+df_upsampled = pd.concat([df_majority, df_minority_upsampled])
+df_upsampled['target'].value_counts()
+```
+- **`pd.concat([df_majority, df_minority_upsampled])`** combines the majority class (Class 0) and the upsampled minority class (Class 1) into a new DataFrame `df_upsampled`.
+- **`df_upsampled['target'].value_counts()`** shows that both classes now have 900 samples each, effectively balancing the dataset through upsampling.
+
+---
+
+### Example:
+Before upsampling, you had:
+- **Class 0 (majority):** 900 samples
+- **Class 1 (minority):** 100 samples
+
+After upsampling, both classes have 900 samples. The minority class (Class 1) has been artificially increased by resampling (with replacement) from its original 100 samples.
+
+### **What is happening in Upsampling?**
+Upsampling is a technique where the minority class is sampled with replacement to match the size of the majority class. This prevents the model from being biased towards the majority class, giving equal importance to both classes.
+
+---
+
+In **upsampling**, we increase the minority class size by duplicating its samples. We use `replace=True` because we want to allow repeated selection of the same sample (with replacement) to reach the majority class size.
+
+In **downsampling**, we reduce the majority class size by randomly selecting a subset of its data. Here, `replace=False` is used to ensure each selected sample is unique, avoiding duplicates (without replacement).
+
+We use these techniques to balance the dataset and prevent model bias toward the majority class.
+
+**SMOTE (Synthetic Minority Oversampling Technique)** helps balance an imbalanced dataset by creating synthetic data points for the minority class. Let’s break down the process using your code and simple explanations.
+
+### Steps:
+1. **Data Generation**:
+   ```python
+   from sklearn.datasets import make_classification
+   X, y = make_classification(n_samples=1000, n_redundant=0, n_features=2, n_clusters_per_class=1,
+                              weights=[0.90], random_state=12)
+   ```
+   - Here, we create a dataset with 1000 samples, where 90% belong to class 0 (majority) and 10% to class 1 (minority).
+   - The features `f1` and `f2` represent the two input features for each sample.
+  
+   **Example**: Imagine you have 1000 marbles, where 900 are red (class 0) and 100 are blue (class 1). This dataset is imbalanced.
+
+2. **Visualizing the Imbalance**:
+   ```python
+   import pandas as pd
+   final_df = pd.concat([pd.DataFrame(X, columns=['f1', 'f2']), pd.DataFrame(y, columns=['target'])], axis=1)
+   plt.scatter(final_df['f1'], final_df['f2'], c=final_df['target'])
+   ```
+   - We plot the data to visualize how the two classes are distributed.
+
+   **Example**: Imagine placing 100 blue marbles among 900 red ones. You’ll see a lot of red marbles clustered together, with only a few blue scattered.
+
+3. **Applying SMOTE**:
+   ```python
+   from imblearn.over_sampling import SMOTE
+   oversample = SMOTE()
+   X, y = oversample.fit_resample(final_df[['f1', 'f2']], final_df['target'])
+   ```
+   - SMOTE creates synthetic examples of the minority class by generating new data points that lie between existing minority samples.
+   - In this step, we balance the dataset by adding synthetic class 1 data to make both classes equal (900 each).
+
+   **Example**: Instead of adding more blue marbles by hand, SMOTE "creates" new blue marbles by looking at the existing ones and generating new similar marbles between them.
+
+4. **Result**:
+   ```python
+   plt.scatter(oversample_df['f1'], oversample_df['f2'], c=oversample_df['target'])
+   ```
+   - After applying SMOTE, the data is balanced, and both class 0 and class 1 have 900 samples each.
+   - The plot now shows an even distribution of both classes.
+
+**Why Use SMOTE?**
+SMOTE helps when a model is biased toward the majority class in an imbalanced dataset. Instead of simply duplicating minority samples, SMOTE creates synthetic data by "interpolating" between them, making the minority class more diverse and avoiding overfitting.
+**SMOTE** identifies which class is the **minority** (the one with fewer samples) and which is the **majority**. Then, it generates synthetic samples for the minority class by creating new points between existing minority data points.
+
+Here’s how it works:
+- SMOTE doesn't just duplicate the minority samples. Instead, it picks two nearby minority samples and generates a new sample between them. This helps create a more diverse set of minority data points.
+  
+In simple terms:
+- If you have 100 blue marbles (minority) and 900 red marbles (majority), SMOTE adds **new** blue marbles by "mixing" two nearby blue marbles to create a new one, making the blue and red marbles equal in number.
+This helps prevent overfitting and improves model performance on imbalanced datasets.
+
+
+### 5-number summary:
+This gives a quick snapshot of how your data is spread:
+1. **Minimum**: The smallest value (32 in your data).
+2. **Q1 (First Quartile)**: The 25th percentile, meaning 25% of the data is below this value (54).
+3. **Median**: The middle value when data is sorted (67).
+4. **Q3 (Third Quartile)**: The 75th percentile, meaning 75% of the data is below this value (89).
+5. **Maximum**: The largest value (99).
+
+### Interquartile Range (IQR):
+- **IQR** = Q3 - Q1 = 89 - 54 = **35**. This range measures the spread of the middle 50% of your data.
+  
+### Detecting Outliers:
+Outliers are data points that are significantly higher or lower than most of the data. To detect them:
+- **Lower fence** = Q1 - 1.5 * IQR = 54 - 1.5 * 35 = **1.5**
+- **Upper fence** = Q3 + 1.5 * IQR = 89 + 1.5 * 35 = **141.5**
+
+Any data points below **1.5** or above **141.5** are considered **outliers**. In your first dataset, there are no such values, so no outliers. 
+
+### Example with Outliers:
+In the second dataset, where you added extreme values like `-100, -200, 150, 170, 180`, these are considered **outliers** because they lie outside the lower and upper fences. The box plot visually highlights these outliers.
+
+### Box Plot:
+- The box represents the middle 50% of the data (between Q1 and Q3).
+- The "whiskers" extend to the smallest and largest non-outlier values.
+- **Outliers** appear as points outside the whiskers (as seen in the second plot).
+
+In summary:
+- The **5-number summary** and **IQR** help you detect **outliers**.
+- **Box plots** give a visual representation of your data spread and highlight any outliers.
+  Let's break down the three types of data encoding—**One Hot Encoding**, **Label Encoding**, and **Ordinal Encoding**—using the code you provided along with examples for better understanding.
+
+### 1. **One Hot Encoding (OHE) / Nominal Encoding**
+
+**Explanation:**
+One Hot Encoding transforms categorical data into a form that can be used in machine learning models by creating a binary (0 or 1) column for each unique category in the dataset.
+
+**Example:**
+Let’s say you have a column called `color` with values: `['red', 'blue', 'green']`. OHE will create new columns for each unique value of the `color` variable:
+
+- `Red: [1, 0, 0]`
+- `Blue: [0, 1, 0]`
+- `Green: [0, 0, 1]`
+
+Each row will have a 1 for its respective category, and 0 elsewhere.
+
+#### Code:
+```python
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+
+# Sample dataframe
+df = pd.DataFrame({
+    'color': ['red', 'blue', 'green', 'green', 'red', 'blue']
+})
+
+# One hot encoding
+encoder = OneHotEncoder()
+encoded = encoder.fit_transform(df[['color']]).toarray()
+
+# Convert to dataframe for easier view
+encoder_df = pd.DataFrame(encoded, columns=encoder.get_feature_names_out())
+print(encoder_df)
+```
+
+**Output:**
+```
+   color_blue  color_green  color_red
+0         0.0          0.0        1.0
+1         1.0          0.0        0.0
+2         0.0          1.0        0.0
+3         0.0          1.0        0.0
+4         0.0          0.0        1.0
+5         1.0          0.0        0.0
+```
+
+This is useful when the categorical variable doesn’t have an inherent order.
+
+---
+
+### 2. **Label Encoding**
+
+**Explanation:**
+Label Encoding assigns each unique category a different integer value. This can be useful when there is no need for binary representation. However, be cautious when using label encoding for variables without a natural order, as the algorithm might misinterpret the encoding as ordinal.
+
+**Example:**
+Consider the `color` column again. Instead of creating new columns, label encoding will assign integers to each color:
+
+- `Red: 2`
+- `Green: 1`
+- `Blue: 0`
+
+#### Code:
+```python
+from sklearn.preprocessing import LabelEncoder
+
+# Label encoding
+lbl_encoder = LabelEncoder()
+encoded_labels = lbl_encoder.fit_transform(df['color'])
+print(encoded_labels)
+```
+
+**Output:**
+```
+[2 0 1 1 2 0]
+```
+
+Here, `red` gets encoded as 2, `blue` as 0, and `green` as 1.
+
+---
+
+### 3. **Ordinal Encoding**
+
+**Explanation:**
+Ordinal Encoding is used when the categorical values have a meaningful order or rank. For example, education levels like `['High school', 'College', 'Graduate', 'Post-graduate']`. Each category is assigned a number based on its rank.
+
+**Example:**
+Consider a dataset with a `size` column having values `['small', 'medium', 'large']`. Since these values have an order (small < medium < large), ordinal encoding is suitable here.
+
+- `small: 0`
+- `medium: 1`
+- `large: 2`
+
+#### Code:
+```python
+from sklearn.preprocessing import OrdinalEncoder
+
+# Sample dataframe
+df = pd.DataFrame({
+    'size': ['small', 'medium', 'large', 'medium', 'small', 'large']
+})
+
+# Ordinal encoding
+encoder = OrdinalEncoder(categories=[['small', 'medium', 'large']])
+encoded = encoder.fit_transform(df[['size']])
+print(encoded)
+```
+
+**Output:**
+```
+[[0.]
+ [1.]
+ [2.]
+ [1.]
+ [0.]
+ [2.]]
+```
+
+In this case, `small` is encoded as 0, `medium` as 1, and `large` as 2, which reflects their natural order.
+
+---
+
+### Key Differences:
+- **One Hot Encoding** creates multiple binary columns for each category, suitable for nominal (non-ordered) categorical variables.
+- **Label Encoding** assigns an integer label to each category, often used when the categorical data has no specific order, but can cause issues if misinterpreted as ordinal.
+- **Ordinal Encoding** is specifically for categorical data with a clear, meaningful order, such as rankings or levels.
+**Target Guided Ordinal Encoding** is a technique that encodes categorical variables based on their relationship with the target variable (usually a numeric value, like "price" or "salary"). This encoding method assigns numerical values to categories by calculating a summary statistic (like the mean or median) of the target variable for each category. This helps create a numerical relationship between the categorical and target variables, which can improve the performance of machine learning models.
+
+Here’s a simple breakdown of how **Target Guided Ordinal Encoding** works:
+
+### Example Code and Explanation:
+
+```python
+import pandas as pd
+
+# create a sample dataframe with a categorical variable and a target variable
+df = pd.DataFrame({
+    'city': ['New York', 'London', 'Paris', 'Tokyo', 'New York', 'Paris'],
+    'price': [200, 150, 300, 250, 180, 320]
+})
+```
+
+#### Step 1: Grouping by the Categorical Variable
+We have a dataset with two columns: `city` (categorical) and `price` (target). In this case, we want to encode the `city` variable based on the average (mean) of `price` for each city.
+
+```python
+mean_price = df.groupby('city')['price'].mean().to_dict()
+mean_price
+```
+
+Here’s what happens:
+- We group the `df` DataFrame by the `city` column and compute the mean of the `price` for each city.
+- The result is a dictionary where each city is mapped to its corresponding mean `price`.
+
+```python
+{'London': 150.0, 'New York': 190.0, 'Paris': 310.0, 'Tokyo': 250.0}
+```
+
+This means:
+- London has an average price of 150.0.
+- New York has an average price of 190.0, and so on.
+
+#### Step 2: Encoding the Categorical Variable
+Now, we map the cities to their corresponding mean prices using the `map()` function. This replaces the city names with the mean price values, creating a numerical relationship between the `city` and `price`.
+
+```python
+df['city_encoded'] = df['city'].map(mean_price)
+df[['price', 'city_encoded']]
+```
+
+This generates a new column `city_encoded`, where:
+- Cities like "New York" are replaced by their average price (190.0),
+- "Paris" by 310.0, etc.
+
+#### Result:
+```plaintext
+   price  city_encoded
+0    200         190.0
+1    150         150.0
+2    300         310.0
+3    250         250.0
+4    180         190.0
+5    320         310.0
+```
+
+So, now the cities have been encoded based on the mean price of that city. This kind of encoding captures the relationship between the category and the target variable in a way that can be more informative for predictive models.
+
+### Why Use Target Guided Ordinal Encoding?
+- **Large number of categories**: It is useful when a categorical variable has a lot of unique values (like city names, product IDs).
+- **Monotonic relationship**: It creates a relationship between the category and the target variable (price, in this case). This is important because machine learning algorithms typically perform better when there’s a numerical and ordered relationship between features and target variables.
+
+### Real-World Example:
+Suppose you are working on a house price prediction problem, and you have a `neighborhood` variable. Instead of just encoding neighborhoods arbitrarily, you can replace them with the average house price of that neighborhood. This helps your model understand which neighborhoods tend to be more expensive and which are less so.
+
+
+
 # EDA (Exploratory Data Analysis) on the Red Wine Dataset:
 
 ### 1. Data Overview
@@ -1501,173 +1896,3 @@ print("Number of 5 rated apps:", count_five_rated_apps)
 ### Conclusion
 
 Using built-in methods is generally faster and more efficient than looping through rows, especially for large datasets. However, both methods achieve the same result. You can choose the one that you find more intuitive!
-
-
-### 1. **Imports and Random Seed**
-```python
-import numpy as np
-import pandas as pd
-
-# Set the random seed for reproducibility
-np.random.seed(123)
-```
-- **`numpy`** (`np`) is used for numerical operations like generating random numbers.
-- **`pandas`** (`pd`) is used to handle data in tabular format, especially for creating and manipulating DataFrames.
-- **`np.random.seed(123)`** sets a fixed seed for random number generation to ensure that the results are reproducible. This ensures that every time the code runs, the same random data is generated.
-
-### 2. **Creating an Imbalanced Dataset**
-```python
-# Create a dataframe with two classes
-n_samples = 1000
-class_0_ratio = 0.9
-n_class_0 = int(n_samples * class_0_ratio)
-n_class_1 = n_samples - n_class_0
-n_class_0,n_class_1
-```
-- **`n_samples = 1000`** defines the total number of samples.
-- **`class_0_ratio = 0.9`** means that 90% of the data will belong to class 0.
-- **`n_class_0 = int(n_samples * class_0_ratio)`** calculates the number of class 0 samples, which is 900 (90% of 1000).
-- **`n_class_1 = n_samples - n_class_0`** calculates the number of class 1 samples, which is 100 (the remaining 10%).
-
-This results in an imbalanced dataset with 900 samples of class 0 and only 100 samples of class 1.
-
-### 3. **Creating Data for Each Class**
-```python
-## CREATE MY DATAFRAME WITH IMBALANCED DATASET
-class_0 = pd.DataFrame({
-    'feature_1': np.random.normal(loc=0, scale=1, size=n_class_0),
-    'feature_2': np.random.normal(loc=0, scale=1, size=n_class_0),
-    'target': [0] * n_class_0
-})
-
-class_1 = pd.DataFrame({
-    'feature_1': np.random.normal(loc=2, scale=1, size=n_class_1),
-    'feature_2': np.random.normal(loc=2, scale=1, size=n_class_1),
-    'target': [1] * n_class_1
-})
-```
-- For **Class 0 (majority)**, you are creating a DataFrame with two features (`feature_1`, `feature_2`), both normally distributed around `mean=0` and `std_dev=1`. All samples in this class have a `target` of 0.
-- For **Class 1 (minority)**, the same two features are normally distributed but centered around `mean=2` to create a distinction from Class 0. All samples in this class have a `target` of 1.
-
-### 4. **Combining the DataFrames**
-```python
-df = pd.concat([class_0, class_1]).reset_index(drop=True)
-df.tail()
-```
-- **`pd.concat([class_0, class_1])`** combines the majority (Class 0) and minority (Class 1) data into one DataFrame.
-- **`reset_index(drop=True)`** ensures the index is reset after concatenation to avoid duplicate index values.
-- **`df.tail()`** prints the last 5 rows of the combined DataFrame.
-
-### 5. **Checking Class Distribution**
-```python
-df['target'].value_counts()
-```
-- **`df['target'].value_counts()`** displays the count of each class in the `target` column, showing that Class 0 has 900 samples and Class 1 has 100 samples—confirming the dataset is imbalanced.
-
----
-
-## Upsampling (Over-Sampling)
-
-### 6. **Separating Majority and Minority Classes**
-```python
-df_minority = df[df['target'] == 1]
-df_majority = df[df['target'] == 0]
-```
-- **`df_minority = df[df['target'] == 1]`** filters the DataFrame to get only the minority class (Class 1).
-- **`df_majority = df[df['target'] == 0]`** filters the DataFrame to get the majority class (Class 0).
-
-### 7. **Resampling (Upsampling the Minority Class)**
-```python
-from sklearn.utils import resample
-
-df_minority_upsampled = resample(df_minority,
-                                 replace=True, # Sample with replacement
-                                 n_samples=len(df_majority), # Match majority class size
-                                 random_state=42
-                                )
-```
-- **`resample`** is a function from `sklearn.utils` that allows sampling with or without replacement.
-- **`replace=True`** means we are sampling *with replacement*, meaning the same sample can appear multiple times. This is necessary because we are oversampling the minority class to match the number of majority class samples.
-- **`n_samples=len(df_majority)`** ensures that the minority class is upsampled to have the same number of samples as the majority class (900 samples).
-- **`random_state=42`** ensures reproducibility, similar to setting a seed.
-
-### 8. **Combining the Upsampled Minority Class with the Majority Class**
-```python
-df_upsampled = pd.concat([df_majority, df_minority_upsampled])
-df_upsampled['target'].value_counts()
-```
-- **`pd.concat([df_majority, df_minority_upsampled])`** combines the majority class (Class 0) and the upsampled minority class (Class 1) into a new DataFrame `df_upsampled`.
-- **`df_upsampled['target'].value_counts()`** shows that both classes now have 900 samples each, effectively balancing the dataset through upsampling.
-
----
-
-### Example:
-Before upsampling, you had:
-- **Class 0 (majority):** 900 samples
-- **Class 1 (minority):** 100 samples
-
-After upsampling, both classes have 900 samples. The minority class (Class 1) has been artificially increased by resampling (with replacement) from its original 100 samples.
-
-### **What is happening in Upsampling?**
-Upsampling is a technique where the minority class is sampled with replacement to match the size of the majority class. This prevents the model from being biased towards the majority class, giving equal importance to both classes.
-
----
-
-In **upsampling**, we increase the minority class size by duplicating its samples. We use `replace=True` because we want to allow repeated selection of the same sample (with replacement) to reach the majority class size.
-
-In **downsampling**, we reduce the majority class size by randomly selecting a subset of its data. Here, `replace=False` is used to ensure each selected sample is unique, avoiding duplicates (without replacement).
-
-We use these techniques to balance the dataset and prevent model bias toward the majority class.
-
-**SMOTE (Synthetic Minority Oversampling Technique)** helps balance an imbalanced dataset by creating synthetic data points for the minority class. Let’s break down the process using your code and simple explanations.
-
-### Steps:
-1. **Data Generation**:
-   ```python
-   from sklearn.datasets import make_classification
-   X, y = make_classification(n_samples=1000, n_redundant=0, n_features=2, n_clusters_per_class=1,
-                              weights=[0.90], random_state=12)
-   ```
-   - Here, we create a dataset with 1000 samples, where 90% belong to class 0 (majority) and 10% to class 1 (minority).
-   - The features `f1` and `f2` represent the two input features for each sample.
-  
-   **Example**: Imagine you have 1000 marbles, where 900 are red (class 0) and 100 are blue (class 1). This dataset is imbalanced.
-
-2. **Visualizing the Imbalance**:
-   ```python
-   import pandas as pd
-   final_df = pd.concat([pd.DataFrame(X, columns=['f1', 'f2']), pd.DataFrame(y, columns=['target'])], axis=1)
-   plt.scatter(final_df['f1'], final_df['f2'], c=final_df['target'])
-   ```
-   - We plot the data to visualize how the two classes are distributed.
-
-   **Example**: Imagine placing 100 blue marbles among 900 red ones. You’ll see a lot of red marbles clustered together, with only a few blue scattered.
-
-3. **Applying SMOTE**:
-   ```python
-   from imblearn.over_sampling import SMOTE
-   oversample = SMOTE()
-   X, y = oversample.fit_resample(final_df[['f1', 'f2']], final_df['target'])
-   ```
-   - SMOTE creates synthetic examples of the minority class by generating new data points that lie between existing minority samples.
-   - In this step, we balance the dataset by adding synthetic class 1 data to make both classes equal (900 each).
-
-   **Example**: Instead of adding more blue marbles by hand, SMOTE "creates" new blue marbles by looking at the existing ones and generating new similar marbles between them.
-
-4. **Result**:
-   ```python
-   plt.scatter(oversample_df['f1'], oversample_df['f2'], c=oversample_df['target'])
-   ```
-   - After applying SMOTE, the data is balanced, and both class 0 and class 1 have 900 samples each.
-   - The plot now shows an even distribution of both classes.
-
-**Why Use SMOTE?**
-SMOTE helps when a model is biased toward the majority class in an imbalanced dataset. Instead of simply duplicating minority samples, SMOTE creates synthetic data by "interpolating" between them, making the minority class more diverse and avoiding overfitting.
-**SMOTE** identifies which class is the **minority** (the one with fewer samples) and which is the **majority**. Then, it generates synthetic samples for the minority class by creating new points between existing minority data points.
-
-Here’s how it works:
-- SMOTE doesn't just duplicate the minority samples. Instead, it picks two nearby minority samples and generates a new sample between them. This helps create a more diverse set of minority data points.
-  
-In simple terms:
-- If you have 100 blue marbles (minority) and 900 red marbles (majority), SMOTE adds **new** blue marbles by "mixing" two nearby blue marbles to create a new one, making the blue and red marbles equal in number.
-This helps prevent overfitting and improves model performance on imbalanced datasets.
